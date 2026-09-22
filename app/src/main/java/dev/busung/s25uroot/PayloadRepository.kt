@@ -102,8 +102,13 @@ class PayloadRepository(private val context: Context) {
     private fun rawUrl(commit: String, path: String) = "$RAW_REPOSITORY/$commit/$path"
 
     private fun pinArtifactUrl(url: String, commit: String): String {
-        require(url.startsWith(MUTABLE_RAW_PREFIX)) { context.getString(R.string.repo_url_invalid) }
-        return "$RAW_REPOSITORY/$commit/${url.removePrefix(MUTABLE_RAW_PREFIX)}"
+        val match = RAW_ARTIFACT_URL.matchEntire(url)
+        require(match != null) { context.getString(R.string.repo_url_invalid) }
+        val path = match.groupValues[1]
+        require(ARTIFACT_PATH.matches(path) && path.split('/').none { it == "." || it == ".." }) {
+            context.getString(R.string.repo_url_invalid)
+        }
+        return "$RAW_REPOSITORY/$commit/$path"
     }
 
     private fun downloadBytes(url: String, maximum: Int): ByteArray {
@@ -137,11 +142,16 @@ class PayloadRepository(private val context: Context) {
 
     companion object {
         private const val COMMIT_API_URL =
-            "https://api.github.com/repos/FallmoonXD/Root-My-Galaxy-Payloads/git/ref/heads/add-pa3q-S9380ZCSCCZG1"
+            "https://api.github.com/repos/KaguraiYoRoy/Root-My-Galaxy-Payloads/git/ref/heads/main"
         private const val RAW_REPOSITORY =
-            "https://raw.githubusercontent.com/FallmoonXD/Root-My-Galaxy-Payloads"
-        private const val MUTABLE_RAW_PREFIX = "$RAW_REPOSITORY/main/"
+            "https://raw.githubusercontent.com/KaguraiYoRoy/Root-My-Galaxy-Payloads"
         private const val MAX_COMMIT_RESPONSE_BYTES = 16 * 1024
         private const val MAX_MANIFEST_BYTES = 256 * 1024
+
+        // Manifest entries may name any GitHub raw URL; only the path under the
+        // ref is kept and re-pinned to this repository's commit, so a manifest
+        // that still points at an upstream mirror resolves to our own artifacts.
+        private val RAW_ARTIFACT_URL = Regex("""https://raw\.githubusercontent\.com/[^/]+/[^/]+/[^/]+/(.+)""")
+        private val ARTIFACT_PATH = Regex("""[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*""")
     }
 }
